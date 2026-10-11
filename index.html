@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Word Cypher</title>
+<meta name="description" content="A crossword tile game where every dictionary word counts, and so does Urban Dictionary slang. Play the CPU or friends online.">
+<meta name="theme-color" content="#2b2d35">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Word Cypher">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Word <span>Cypher</span></h1>
+      <p>The full dictionary, plus anything Urban Dictionary calls a word.</p>
+    </div>
+    <div class="top-actions">
+      <button class="btn" id="btnRename" type="button" hidden>Change name</button>
+      <button class="btn" id="btnLeave" type="button" hidden>Leave</button>
+    </div>
+  </header>
+
+  <!-- HOME -->
+  <section id="home" aria-label="Start a game">
+    <div class="home">
+      <section class="card">
+        <h2>Play online</h2>
+        <p class="lead">Host a room and send the code to up to 3 friends. Your browser runs the game, so keep this tab open while you play.</p>
+        <div class="field">
+          <label for="nameInput">Your name</label>
+          <div class="inrow">
+            <input class="text" id="nameInput" maxlength="20" autocomplete="off">
+            <button class="btn" id="btnDice" type="button" title="Random name">Random</button>
+          </div>
+        </div>
+        <div id="resumeBox" class="resume" hidden></div>
+        <button class="btn spray big" id="btnHost" type="button">Host a game</button>
+        <div class="field">
+          <label for="codeInput">Join with a code</label>
+          <form class="inrow" id="joinForm" autocomplete="off">
+            <input class="text code" id="codeInput" maxlength="5" placeholder="K7QXM" inputmode="text" autocapitalize="characters">
+            <button class="btn primary" type="submit">Join</button>
+          </form>
+        </div>
+        <div class="status" id="homeStatus" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>Play the CPU</h2>
+        <p class="lead">Solo game against the computer. It plays dictionary words and well-known slang.</p>
+        <div id="soloResume" class="resume" hidden></div>
+        <div class="levels">
+          <button class="opt" type="button" data-solo="easy"><b>Easy</b><span>Plays it loose</span></button>
+          <button class="opt" type="button" data-solo="medium"><b>Medium</b><span>Solid, beatable</span></button>
+          <button class="opt" type="button" data-solo="hard"><b>Hard</b><span>Max play every turn</span></button>
+        </div>
+        <label class="toggle"><input type="checkbox" id="soloSlang" checked><span><b>Allow Urban Dictionary slang</b><br><span style="color:var(--muted)">Turn off for dictionary-only.</span></span></label>
+      </section>
+
+      <section class="card">
+        <h2>House rules</h2>
+        <ul class="rules">
+          <li>Any word in the full English dictionary counts.</li>
+          <li>Urban Dictionary slang counts too, and every slang word you form adds <b>+5 street cred</b>.</li>
+          <li>Use all 7 tiles in one turn for a <b>+50 bingo</b>.</li>
+          <li>Tap a square and type to place tiles. Enter plays, Backspace takes back.</li>
+        </ul>
+        <div class="legend">
+          <span><i style="background:var(--tw)"></i>Triple word</span>
+          <span><i style="background:var(--dw)"></i>Double word</span>
+          <span><i style="background:var(--tl)"></i>Triple letter</span>
+          <span><i style="background:var(--dl)"></i>Double letter</span>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- LOBBY -->
+  <section id="lobby" class="home" hidden aria-label="Game room">
+    <section class="card">
+      <h2>Room code</h2>
+      <div class="roomcode">
+        <span class="code-big" id="lobbyCode"></span>
+        <button class="btn" id="btnCopyLink" type="button">Copy invite link</button>
+      </div>
+      <p class="lead" id="lobbyLink" style="overflow-wrap:anywhere"></p>
+      <h2>Players</h2>
+      <ul class="seats" id="seatList"></ul>
+      <div id="hostControls" class="field" hidden>
+        <label>Fill a seat with the CPU</label>
+        <div class="levels">
+          <button class="btn" type="button" data-addcpu="easy">+ Easy CPU</button>
+          <button class="btn" type="button" data-addcpu="medium">+ Medium CPU</button>
+          <button class="btn" type="button" data-addcpu="hard">+ Hard CPU</button>
+        </div>
+        <label class="toggle"><input type="checkbox" id="lobbySlang" checked><span><b>Allow Urban Dictionary slang</b></span></label>
+        <button class="btn spray big" id="btnStart" type="button">Start game</button>
+      </div>
+      <div class="status" id="lobbyStatus" aria-live="polite"></div>
+    </section>
+  </section>
+
+  <!-- GAME -->
+  <section id="game" hidden>
+    <div style="display:grid;gap:12px">
+      <div class="roombar" id="roombar" hidden></div>
+      <div class="banner" id="banner" hidden></div>
+      <div class="scores" id="scores" aria-live="polite"></div>
+    </div>
+    <div class="main" style="margin-top:16px">
+      <section class="play" aria-label="Game board">
+        <div class="board-wrap">
+          <div class="board" id="board" role="grid" aria-label="15 by 15 board"></div>
+          <div class="loading" id="loading">Loading 273,000 words…</div>
+        </div>
+        <div class="rack-row">
+          <div class="rack" id="rack" aria-label="Your tiles"></div>
+          <div class="controls">
+            <button class="btn" id="btnShuffle" type="button">Shuffle</button>
+            <button class="btn" id="btnRecall" type="button">Recall</button>
+            <button class="btn" id="btnSwap" type="button">Swap</button>
+            <button class="btn" id="btnPass" type="button">Pass</button>
+          </div>
+        </div>
+        <div class="preview" id="preview" aria-live="polite"></div>
+      </section>
+      <aside class="side">
+        <section class="card">
+          <h2>The cypher</h2>
+          <ol class="log" id="log"></ol>
+        </section>
+        <section class="card checker">
+          <h2>Is it a word?</h2>
+          <form id="checkForm" autocomplete="off">
+            <input id="checkInput" maxlength="15" placeholder="Try RIZZ" aria-label="Word to check">
+            <button class="btn" type="submit">Check</button>
+          </form>
+          <div class="verdict" id="verdict"></div>
+        </section>
+      </aside>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay" hidden></div>
+
+<script src="peerjs.min.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/game.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
