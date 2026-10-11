@@ -215,3 +215,5 @@ body { margin: 0; -webkit-text-size-adjust: 100%; }
 .player.active .name::before { display: none; }
 .player.active .name .turnmark { width: 7px; height: 7px; border-radius: 50%; background: var(--spray); }
 .player.me { background: var(--bg); }
+
+.foot { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 0 32px; color: var(--muted); font-size: 13px; }

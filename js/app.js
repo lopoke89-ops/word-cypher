@@ -11,7 +11,8 @@
     del(k) { try { localStorage.removeItem(k); } catch (e) {} },
   };
 
-  const PROTO = 1;                          // bump when host and guest messages change shape
+  const APP_VERSION = '1.1';
+  const PROTO = 2;                          // bump when host and guest messages change shape
   const PREFIX = 'wordcypher-v1-';          // PeerJS id = PREFIX + room code
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const LEVEL_NAME = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
@@ -28,10 +29,60 @@
   /* ---------- word lists ---------- */
   const lex = new Lexicon();
   let lexReady = false;
-  fetch('words.txt').then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(t => {
+  fetch('words.txt?v=' + APP_VERSION).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(t => {
     lex.load(t); lexReady = true; if (V) lex.slang = V.slang;
     $('loading').hidden = true; render(); scheduleCpu();
   }).catch(() => { $('loading').textContent = "Couldn't load the word lists. Reload the page to try again."; });
+
+  /* ---------- live Urban Dictionary checks ----------
+     Words not in words.txt are looked up on Urban Dictionary. A word counts when UD has
+     LIVE_MIN_DEFS or more definitions for exactly that word. Results are cached; the host's
+     answer is the one that decides a play, and accepted words are shared with everyone. */
+  const liveDefs = new Map();     // word -> number of exact definitions found
+  const liveInflight = new Map(); // word -> Promise
+  let liveTimer = null;
+  const liveFailed = new Map();   // word -> time of a failed request (network), retried after 10s
+  function lookupUrban(word) {
+    if (lex.live.has(word)) return Promise.resolve(lex.live.get(word) === 1);
+    if (liveInflight.has(word)) return liveInflight.get(word);
+    const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 7000);
+    const p = fetch('https://api.urbandictionary.com/v0/define?term=' + encodeURIComponent(word), { signal: ctl.signal })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(j => {
+        const n = (j.list || []).filter(d => String(d.word || '').toLowerCase().trim() === word).length;
+        liveDefs.set(word, n);
+        const ok = n >= LIVE_MIN_DEFS && !UD_BLOCK.test(word);
+        lex.live.set(word, ok ? 1 : 0); liveFailed.delete(word);
+        return ok;
+      })
+      .catch(err => { liveFailed.set(word, Date.now()); throw err; })
+      .finally(() => { clearTimeout(timer); liveInflight.delete(word); });
+    liveInflight.set(word, p);
+    return p;
+  }
+  // words in this play that still need a live check
+  function liveCandidates(res) {
+    if (!lex.slang || res.valid || !res.words) return [];
+    return res.words.filter(w => !w.kind && w.w.length >= LIVE_MIN_LEN && !lex.live.has(w.w) && !UD_BLOCK.test(w.w)).map(w => w.w);
+  }
+  // check every unknown word in a play; resolves to null when done, or an error message
+  async function resolveLive(board, placements) {
+    const words = liveCandidates(scoreMove(board, placements, lex));
+    if (!words.length) return null;
+    try { await Promise.all(words.map(lookupUrban)); return null; }
+    catch (e) { return `Couldn't reach Urban Dictionary to check ${words.map(w => w.toUpperCase()).join(', ')}. Try again in a moment.`; }
+  }
+  function rememberLive(res) {   // host/solo: share live-accepted words with everyone in this game
+    if (!S || !res || !res.words) return;
+    for (const w of res.words) if (w.kind === 2 && !lex.inList(w.w)) S.live[w.w] = 1;
+  }
+  const actionTiles = a => (S && a && a.type === 'play' && Array.isArray(a.tiles)) ? a.tiles : null;
+  function placementsFor(seat, tiles) {   // best-effort placements for the pre-check; act() re-validates everything
+    const rack = S.players[seat] ? S.players[seat].rack : [];
+    return tiles.filter(t => t && Number.isInteger(t.r) && Number.isInteger(t.c) && t.r >= 0 && t.r < N && t.c >= 0 && t.c < N)
+      .map(t => { const own = rack.find(x => x.id === t.id); return own ? { r: t.r, c: t.c, ch: own.ch === '?' ? String(t.ch || 'a') : own.ch, blank: own.ch === '?' } : null; })
+      .filter(Boolean);
+  }
 
   /* ---------- state ---------- */
   let mode = null;      // 'solo' | 'host' | 'guest'
@@ -148,8 +199,24 @@
       waiting = true; guest.conn.send({ t: 'act', a }); render();
       return;
     }
+    const tiles = actionTiles(a);
+    if (tiles) {
+      waiting = true; render();
+      const moveNo = S.moveNo;
+      resolveLive(S.board, placementsFor(mySeat(), tiles)).then(netErr => {
+        waiting = false;
+        if (!S || S.moveNo !== moveNo) return;
+        if (netErr) { flash(netErr); render(); return; }
+        finishLocal(a);
+      });
+      return;
+    }
+    finishLocal(a);
+  }
+  function finishLocal(a) {
     const r = act(S, mySeat(), a, lex);
-    if (!r.ok) { flash(r.error); return; }
+    if (!r.ok) { flash(r.error); render(); return; }
+    rememberLive(r.res);
     afterChange();
   }
 
@@ -160,6 +227,7 @@
     const prev = V ? V.moveNo : -1;
     const wasMyTurn = myTurn();
     V = v; lex.slang = v.slang; waiting = false; flashMsg = '';
+    for (const w of Object.keys(v.live || {})) if (/^[a-z]{2,15}$/.test(w)) lex.live.set(w, 1);
     if (v.moveNo !== prev) {
       selected = null; swapMode = false; swapSel.clear(); passArmed = false;
       if (prev >= 0 && v.last) freshKeys = new Set(v.last.map(([r, c]) => r + ',' + c));
@@ -281,9 +349,21 @@
       if (room.phase !== 'game' || !S) return;
       if (!lexReady) { try { conn.send({ t: 'err', msg: 'The host is still loading the word lists. Try again in a moment.' }); } catch (e) {} return; }
       const seat = S.players.findIndex(p => p.token === tok);
-      const r = act(S, seat, d.a, lex);
-      if (!r.ok) { try { conn.send({ t: 'err', msg: r.error }); } catch (e) {} return; }
-      afterChange();
+      const send = msg => { try { conn.send({ t: 'err', msg }); } catch (e) {} };
+      const finish = () => {
+        const r = act(S, seat, d.a, lex);
+        if (!r.ok) return send(r.error);
+        rememberLive(r.res);
+        afterChange();
+      };
+      const tiles = actionTiles(d.a);
+      if (!tiles || seat !== S.turn) return finish();
+      const moveNo = S.moveNo;
+      resolveLive(S.board, placementsFor(seat, tiles)).then(netErr => {
+        if (mode !== 'host' || !S || S.moveNo !== moveNo) return;
+        if (netErr) return send(netErr);
+        finish();
+      });
     }
   }
 
@@ -616,7 +696,7 @@
       el.innerHTML = `<div class="msg">${off ? `${esc(cur.name)} is disconnected. It's their turn.` : cur.kind === 'cpu' ? `${esc(cur.name)} is looking for a play…` : `Waiting on ${esc(cur.name)}…`}${V.seat >= 0 ? ' You can line up your next word in the meantime.' : ''}</div>${extra}`;
       return;
     }
-    if (waiting) { el.innerHTML = `<div class="msg">Sending your play to the host…</div>`; return; }
+    if (waiting) { el.innerHTML = `<div class="msg">${mode === 'guest' ? 'Sending your play to the host…' : 'Checking your words…'}</div>`; return; }
     if (swapMode) {
       el.innerHTML = `<div class="msg">Tap the tiles you want to throw back. You draw the same number and lose your turn.</div>
         <button class="btn primary" type="button" data-act="doswap" ${swapSel.size ? '' : 'disabled'}>Swap ${swapSel.size || ''} tile${swapSel.size === 1 ? '' : 's'}</button>`;
@@ -628,9 +708,27 @@
       return;
     }
     const res = scoreMove(V.board, pending.map(p => ({ r: p.r, c: p.c, ch: p.ch, blank: p.blank })), lex);
+    const toCheck = liveCandidates(res).filter(w => !(liveFailed.get(w) > Date.now() - 10000));
+    if (toCheck.length) {
+      // wait until typing pauses so each keystroke doesn't trigger a lookup
+      clearTimeout(liveTimer);
+      liveTimer = setTimeout(() => Promise.allSettled(liveCandidates(scoreMove(V.board, pending.map(p => ({ r: p.r, c: p.c, ch: p.ch, blank: p.blank })), lex)).map(lookupUrban)).then(() => render()), 450);
+      el.innerHTML = `<div class="words">${res.words.map(w => `<span class="chip">${w.w.toUpperCase()} <b>${w.kind ? w.pts : '…'}</b></span>`).join('')}</div><div class="msg">Checking ${toCheck.map(w => w.toUpperCase()).join(', ')} on Urban Dictionary…</div>`;
+      return;
+    }
+    const failed = liveCandidates(res);
+    if (failed.length) { el.innerHTML = `<div class="msg err">Couldn't reach Urban Dictionary to check ${failed.map(w => w.toUpperCase()).join(', ')}. Recall a tile and try again in a few seconds.</div>`; return; }
     const chips = res.words.map(w => `<span class="chip ${w.kind === 2 ? 'ud' : ''}">${w.w.toUpperCase()}${w.kind === 2 ? ' <span class="tag">UD</span>' : ''} <b>${w.pts}</b></span>`).join('');
     const extras = (res.bingo ? `<span class="chip">BINGO <b>+50</b></span>` : '') + (res.cred && res.valid ? `<span class="chip ud">STREET CRED <b>+${res.cred}</b></span>` : '');
-    if (!res.valid) el.innerHTML = `<div class="words">${chips}</div><div class="msg err">${esc(res.error)}</div>`;
+    if (!res.valid) {
+      let why = res.error;
+      if (res.bad && lex.slang) {
+        const parts = res.bad.map(W => { const w = W.toLowerCase(); const n = liveDefs.get(w);
+          return n == null ? `${W} isn't a word` : `${W} isn't in the dictionary and has ${n} Urban Dictionary definition${n === 1 ? '' : 's'} (needs ${LIVE_MIN_DEFS})`; });
+        why = parts.join('. ') + '.';
+      }
+      el.innerHTML = `<div class="words">${chips}</div><div class="msg err">${esc(why)}</div>`;
+    }
     else el.innerHTML = `<div class="words">${chips}${extras}</div>${err}<button class="btn spray" type="button" data-act="play">Play for ${res.total}</button>`;
   }
 
@@ -803,11 +901,20 @@
     const v = $('verdict');
     if (!w) { v.textContent = ''; return; }
     if (!lexReady) { v.textContent = 'Still loading the word lists.'; return; }
-    const prev = lex.slang; lex.slang = true; const k = lex.kind(w); lex.slang = prev;
     const W = w.toUpperCase();
-    if (k === 1) v.innerHTML = `<span class="yes">${W} is good.</span> It's in the dictionary. <a href="${lookup(w, 1)}" target="_blank" rel="noopener">Definition</a>`;
-    else if (k === 2) v.innerHTML = `<span class="yes">${W} is good</span> as Urban Dictionary slang${V && !V.slang ? ', but slang is off this game' : ''}. <a href="${lookup(w, 2)}" target="_blank" rel="noopener">See it on UD</a>`;
-    else v.innerHTML = `<span class="no">${W} doesn't count.</span> It's not in either list.`;
+    const slangOff = V && !V.slang ? ', but slang is off this game' : '';
+    const show = () => {
+      const prev = lex.slang; lex.slang = true; const k = lex.kind(w); lex.slang = prev;
+      const n = liveDefs.get(w);
+      if (k === 1) v.innerHTML = `<span class="yes">${W} is good.</span> It's in the dictionary. <a href="${lookup(w, 1)}" target="_blank" rel="noopener">Definition</a>`;
+      else if (k === 2) v.innerHTML = `<span class="yes">${W} is good</span> as Urban Dictionary slang${n != null ? ` (${n} definition${n === 1 ? '' : 's'})` : ''}${slangOff}. <a href="${lookup(w, 2)}" target="_blank" rel="noopener">See it on UD</a>`;
+      else if (n != null) v.innerHTML = `<span class="no">${W} doesn't count.</span> It's not in the dictionary, and Urban Dictionary has ${n} definition${n === 1 ? '' : 's'} (needs ${LIVE_MIN_DEFS}).`;
+      else v.innerHTML = `<span class="no">${W} doesn't count.</span> It's not in the dictionary.`;
+    };
+    const prev = lex.slang; lex.slang = true; const known = lex.kind(w); lex.slang = prev;
+    if (known || w.length < LIVE_MIN_LEN || UD_BLOCK.test(w) || lex.live.has(w)) return show();
+    v.textContent = `Checking ${W} on Urban Dictionary…`;
+    lookupUrban(w).then(show, () => { v.innerHTML = `<span class="no">Couldn't reach Urban Dictionary.</span> Try again in a moment.`; });
   });
 
   // read-only peek for debugging in the browser console: wordCypher.view

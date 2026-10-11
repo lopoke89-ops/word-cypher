@@ -7,6 +7,7 @@ amogus
 asmr
 ate
 aura
+aurafarming
 badd
 baddie
 baddies
@@ -27,6 +28,7 @@ bestie
 besties
 bet
 bff
+bffr
 bih
 bish
 bizzle
@@ -42,6 +44,7 @@ bougie
 boujee
 boutta
 brah
+brainrot
 brb
 bro
 broo
@@ -57,6 +60,7 @@ buggy
 burn
 burned
 burns
+bussdown
 bussin
 bussing
 bussit
@@ -86,6 +90,7 @@ chilled
 chillin
 chilling
 chizzle
+chopped
 clout
 cloutchaser
 clouts
@@ -98,6 +103,8 @@ cope
 coped
 coping
 copium
+crashing
+crashout
 cringe
 cringey
 cringy
@@ -118,6 +125,8 @@ deadass
 ded
 def
 deffo
+delulu
+demure
 discord
 discordian
 discords
@@ -207,6 +216,8 @@ ghostwriter
 gif
 gifs
 gimme
+glazed
+glazing
 glitch
 glitched
 glitchy
@@ -264,6 +275,8 @@ hustler
 hustlin
 huzz
 huzzah
+ick
+icks
 icon
 iconic
 idk
@@ -309,6 +322,8 @@ lemme
 lit
 litty
 lmao
+lock
+locked
 lol
 loot
 looted
@@ -339,6 +354,9 @@ mmo
 modded
 modder
 mods
+mog
+mogged
+mogging
 mukbang
 nah
 nastiest
@@ -363,6 +381,8 @@ ong
 oof
 oofed
 ootd
+opp
+opps
 outta
 owned
 patch
@@ -380,6 +400,7 @@ podcasts
 pog
 pogchamp
 poggers
+pookie
 producer
 pve
 pvp
@@ -442,10 +463,14 @@ simped
 simping
 simps
 sis
+situationship
 sizzle
 sketch
 sketchy
 skibidi
+skrrt
+skrt
+sksksk
 slapping
 slaps
 slay
@@ -528,6 +553,7 @@ trolly
 tryhard
 tryna
 tubular
+tuff
 turnt
 turnup
 twerk
@@ -540,6 +566,8 @@ ughh
 uhh
 uhhuh
 umm
+unc
+uncs
 upvote
 upvoted
 upvotes
@@ -579,6 +607,9 @@ yaaas
 yaas
 yall
 yalls
+yap
+yapper
+yapping
 yass
 yasss
 yeah

@@ -20,6 +20,7 @@ function createGame({ seats, slang = true }, rng = Math.random) {
     nextId: 1,
     players: seats.map(s => ({ name: cleanName(s.name), kind: s.kind, level: s.level || null, token: s.token || null, rack: [], score: 0 })),
     turn: 0, log: [], zeroRun: 0, over: false, slang, last: [], moveNo: 0,
+    live: {},   // words accepted through live Urban Dictionary checks this game
   };
   S.players.forEach(p => drawTiles(S, p));
   return S;
@@ -122,7 +123,7 @@ function cpuAction(S, seat, lex, rng = Math.random) {
   lex.slang = S.slang;
   const all = generateMoves(S.board, p.rack.map(t => t.ch), lex);
   // the CPU sticks to dictionary words and well-known slang so its plays read like real words
-  const moves = all.filter(m => m.score.words.every(w => w.known));
+  const moves = all.filter(m => m.score.words.every(w => w.known && !cpuAvoids(w.w)));
   if (!moves.length) {
     if (S.bag.length >= RACK_SIZE) {
       const keep = new Set('aeinrst?');
@@ -152,7 +153,7 @@ function cpuAction(S, seat, lex, rng = Math.random) {
 function viewFor(S, seat) {
   return {
     board: S.board, bag: S.bag.length, turn: S.turn, log: S.log, over: S.over, slang: S.slang,
-    last: S.last, moveNo: S.moveNo, seat,
+    last: S.last, moveNo: S.moveNo, seat, live: S.live || {},
     players: S.players.map(p => ({ name: p.name, kind: p.kind, level: p.level, score: p.score, tiles: p.rack.length })),
     rack: seat >= 0 && S.players[seat] ? S.players[seat].rack : [],
   };

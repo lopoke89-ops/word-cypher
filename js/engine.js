@@ -23,6 +23,7 @@ class Lexicon {
     this.ch = new Uint8Array(this.cap);
     this.term = new Uint8Array(this.cap);
     this.slang = true; this.count = [0, 0];
+    this.live = new Map();   // word -> 1 (counts, checked live on Urban Dictionary) or 0 (checked, doesn't count)
   }
   grow() {
     const cap = this.cap * 2, g = (A, fill) => { const b = new A.constructor(cap); if (fill !== undefined) b.fill(fill); b.set(A); return b; };
@@ -57,14 +58,29 @@ class Lexicon {
   ok(node) { const t = this.term[node]; return t === 1 || (t > 1 && this.slang); }
   /* 0 = not a word, 1 = dictionary, 2 = Urban Dictionary */
   raw(word) {
-    let node = 0;
-    for (let i = 0; i < word.length; i++) { node = this.next(node, word.charCodeAt(i) - 97); if (node === -1) return 0; }
-    const t = this.term[node];
+    let node = 0, t = 0;
+    for (let i = 0; i < word.length && node !== -1; i++) node = this.next(node, word.charCodeAt(i) - 97);
+    if (node !== -1) t = this.term[node];
+    if (!t && this.live.get(word) === 1) t = 2;   // verified live; never 'known', so the CPU won't use it
     return t > 1 && !this.slang ? 0 : t;
+  }
+  inList(word) {   // in the saved list (ignores live results and the slang setting)
+    let node = 0;
+    for (let i = 0; i < word.length && node !== -1; i++) node = this.next(node, word.charCodeAt(i) - 97);
+    return node !== -1 && this.term[node] > 0;
   }
   /* 1 = dictionary, 2 = Urban Dictionary (3 internally marks well-known slang) */
   kind(word) { return Math.min(this.raw(word), 2); }
 }
+
+/* Live Urban Dictionary rule: a word not in the saved list counts if Urban Dictionary has
+   at least this many definitions for exactly that word. Junk like XOV has 0-1. */
+const LIVE_MIN_DEFS = 3, LIVE_MIN_LEN = 3;
+/* Slurs that live lookups never accept (the saved Urban list was filtered the same way). */
+const UD_BLOCK = /^(n[i1]gg(a|er|ah|uh|az|ers|as)?s?|niglet|fagg?(ot|it|y)?s?|f[a@]g|dykes?|trann(y|ie)s?|kikes?|spics?|chinks?|wetbacks?|gooks?|coons?|retards?|beaners?|towelheads?|sandn\w+|raghead\w*|jiggaboo\w*|porchmonkey\w*|shemales?|pakis?|zipperheads?|gypp?os?)$/;
+/* Words the CPU never plays. Players can still play dictionary words; the CPU stays clean. */
+const CPU_AVOID = /^(wops?|dagos?|spicks?|kykes?|hymies?|honk(y|ies)|gringos?|chinamen|redskins?|squaws?|darkies|darky|negro(es)?|nigra|japs?|krauts?|polacks?|micks?|pickaninn(y|ies)|sambos?|mulattos?|coolies?|ofays?|jigaboos?|whor\w*|sluts?|cunts?)$/;
+const cpuAvoids = w => UD_BLOCK.test(w) || CPU_AVOID.test(w);
 
 function newBag(rng = Math.random) {
   const bag = [];
@@ -145,7 +161,7 @@ function scoreMove(board, placements, lex) {
   res.cred = res.words.filter(s => s.kind === 2).length * CRED;
   total += res.cred;
   res.total = total;
-  if (bad.length) { res.error = `${bad.join(', ')} ${bad.length > 1 ? "aren't words" : "isn't a word"} in either dictionary.`; return res; }
+  if (bad.length) { res.bad = bad; res.error = `${bad.join(', ')} ${bad.length > 1 ? "aren't words" : "isn't a word"}${lex.slang ? ' in the dictionary or on Urban Dictionary' : ' in the dictionary (slang is off)'}.`; return res; }
   res.valid = true;
   return res;
 }

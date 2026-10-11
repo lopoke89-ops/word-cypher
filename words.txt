@@ -180253,7 +180253,7 @@ poojas
 pook
 pooka
 pookas
-*pookie
+!pookie
 pooking
 pookit
 pooks
@@ -273012,3 +273012,18 @@ zyzzyva
 zyzzyvas
 zzz
 zzzs
+!delulu
+!unc
+!uncs
+!opp
+!opps
+!skrrt
+!skrt
+!aurafarming
+!sksksk
+!bussdown
+!crashout
+!icks
+!situationship
+!bffr
+!brainrot

@@ -15,6 +15,15 @@ To update later: change files, **Commit to main**, **Push origin**. Pages refres
 
 On iPhone, open the link in Safari, tap Share → **Add to Home Screen** to get it as an app icon.
 
+## How words are checked
+
+1. **Saved list first.** `words.txt` has about 270,000 dictionary words and about 3,100 Urban Dictionary words. These count instantly.
+2. **Live Urban Dictionary second.** If a word isn't in the saved list, the game looks it up on Urban Dictionary right then. It counts if Urban Dictionary has **3 or more definitions** for exactly that word, so brand-new slang works the day it shows up there, while keyboard junk (0–1 definitions) doesn't. Names and some made-up words will count too; that's Urban Dictionary.
+3. In online games **the host's browser makes the call**, so every player gets the same answer. Words accepted live are shared with everyone in the game.
+4. The **CPU only plays saved-list words**, and never slurs or a short list of insults. Live lookups never accept the slurs filtered out of the Urban list.
+
+The "Is it a word?" box uses the same rules and shows how many Urban Dictionary definitions a word has.
+
 ## How online play works
 
 - It's peer to peer, the same way PALISADE does it (PeerJS). The free PeerJS server only introduces browsers to each other; after that the host and guests talk directly.
@@ -49,6 +58,8 @@ To add slang, add a line like `!skrrt` anywhere in the file. Order doesn't matte
 ### Changing the online protocol
 
 If you change the messages between host and guests in `js/app.js`, bump `PROTO` at the top of that file. Guests on an old cached copy then get told to refresh instead of breaking mid-game.
+
+When you release an update, bump `APP_VERSION` in `js/app.js` and the `?v=` numbers in `index.html` (and the footer). That makes browsers load the new files instead of a cached copy.
 
 ## Testing
 
