@@ -15,6 +15,7 @@ function tileValue(ch) { return ch === '?' ? 0 : VALUES[ch]; }
 function createGame({ seats, slang = true }, rng = Math.random) {
   const S = {
     v: 1,
+    gameId: Math.random().toString(36).slice(2, 10),
     board: Array.from({ length: N }, () => Array(N).fill(null)),
     bag: newBag(rng),
     nextId: 1,
@@ -153,7 +154,7 @@ function cpuAction(S, seat, lex, rng = Math.random) {
 function viewFor(S, seat) {
   return {
     board: S.board, bag: S.bag.length, turn: S.turn, log: S.log, over: S.over, slang: S.slang,
-    last: S.last, moveNo: S.moveNo, seat, live: S.live || {},
+    last: S.last, moveNo: S.moveNo, seat, live: S.live || {}, gameId: S.gameId,
     players: S.players.map(p => ({ name: p.name, kind: p.kind, level: p.level, score: p.score, tiles: p.rack.length })),
     rack: seat >= 0 && S.players[seat] ? S.players[seat].rack : [],
   };

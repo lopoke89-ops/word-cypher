@@ -11,7 +11,7 @@
     del(k) { try { localStorage.removeItem(k); } catch (e) {} },
   };
 
-  const APP_VERSION = '1.2';
+  const APP_VERSION = '1.3';
   const PROTO = 2;                          // bump when host and guest messages change shape
   const PREFIX = 'wordcypher-v1-';          // PeerJS id = PREFIX + room code
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -157,7 +157,7 @@
   $('home').addEventListener('click', e => {
     const r = e.target.closest('[data-resume]')?.dataset.resume; if (!r) return;
     if (r === 'host') hostResume(store.get('wc.host'));
-    if (r === 'guest') guestJoin(store.get('wc.guest').code);
+    if (r === 'guest') guestJoin(store.get('wc.guest').code, true);
     if (r === 'solo') { mode = 'solo'; S = store.get('wc.solo'); show('game'); afterChange(); }
     if (r === 'drophost') { store.del('wc.host'); renderHome(); }
     if (r === 'dropguest') { store.del('wc.guest'); renderHome(); }
@@ -197,7 +197,7 @@
   function doAction(a) {
     if (mode === 'guest') {
       if (!guest.conn || !guest.conn.open) { flash('Not connected to the host right now.'); return; }
-      waiting = true; guest.conn.send({ t: 'act', a }); render();
+      waiting = true; guest.conn.send({ t: 'act', a, moveNo: V ? V.moveNo : -1 }); render();
       return;
     }
     const tiles = actionTiles(a);
@@ -225,6 +225,7 @@
   function flash(msg) { flashMsg = msg; renderPreview(); }
 
   function setView(v) {
+    if (V && v.gameId !== V.gameId) { pending = []; rackOrder = []; cursor = null; V = null; }   // new game: tile ids restart
     const prev = V ? V.moveNo : -1;
     const wasMyTurn = myTurn();
     V = v; lex.slang = v.slang; waiting = false; flashMsg = '';
@@ -272,7 +273,7 @@
     if (room.phase === 'game' && S) { show('game'); afterChange(); } else { room.phase = 'lobby'; show('lobby'); renderLobby(); }
     openHostPeer(0);
   }
-  function saveHost() { if (room) store.set('wc.host', { code: room.code, phase: room.phase, seats: room.seats, slang: room.slang, S }); }
+  function saveHost() { if (room) store.set('wc.host', { code: room.code, phase: room.phase, seats: room.seats, slang: room.slang, S, at: Date.now() }); }
 
   function openHostPeer(attempt) {
     if (mode !== 'host') return;
@@ -310,6 +311,7 @@
     if (mode !== 'host' || !d || typeof d !== 'object') return;
     if (d.t === 'hello') {
       const token = typeof d.token === 'string' ? d.token.slice(0, 40) : '';
+      if (conn.token && conn.token !== token) return;   // one connection can only ever be one player
       if (!token || token === myToken) return bye(conn, "Can't join your own room from the same browser.");
       if (d.v !== PROTO) return bye(conn, 'Your game is a different version. Refresh the page and try again.');
       const name = cleanName(d.name);
@@ -351,6 +353,7 @@
       if (!lexReady) { try { conn.send({ t: 'err', msg: 'The host is still loading the word lists. Try again in a moment.' }); } catch (e) {} return; }
       const seat = S.players.findIndex(p => p.token === tok);
       const send = msg => { try { conn.send({ t: 'err', msg }); } catch (e) {} };
+      if (Number.isInteger(d.moveNo) && d.moveNo !== S.moveNo) { send('The board changed before your move arrived. Check it and try again.'); return afterChange(); }
       const finish = () => {
         const r = act(S, seat, d.a, lex);
         if (!r.ok) return send(r.error);
@@ -436,10 +439,10 @@
   }
 
   /* ---------- guest ---------- */
-  function guestJoin(code) {
+  function guestJoin(code, rejoin) {
     mode = 'guest';
-    guest = { code, peer: null, conn: null, lobby: null, joined: false, lastSeen: 0, closing: false, retry: null };
-    store.set('wc.guest', { code });
+    guest = { code, peer: null, conn: null, lobby: null, joined: false, lastSeen: 0, closing: false, retry: null, rejoin: !!rejoin, started: Date.now() };
+    store.set('wc.guest', { code, at: Date.now() });
     V = null; show('lobby'); renderLobby();
     setStatus('lobbyStatus', `Connecting to room ${code}…`);
     openGuestPeer();
@@ -453,7 +456,8 @@
     peer.on('error', err => {
       if (guest !== g || g.closing) return;
       if (err.type === 'peer-unavailable') {
-        if (!g.joined) { store.del('wc.guest'); try { peer.destroy(); } catch (e) {} goHome(`No open room with code ${g.code}. Check the code with the host, and make sure their game is open.`, true); }
+        if (!g.joined && g.rejoin && Date.now() - g.started < 60000) guestRetry('Waiting for the host to reopen the room…');
+        else if (!g.joined) { store.del('wc.guest'); try { peer.destroy(); } catch (e) {} goHome(`No open room with code ${g.code}. Check the code with the host, and make sure their game is open.`, true); }
         else guestRetry('The host is offline. Waiting for them to come back…');
       } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
         guestRetry("Can't reach the matchmaking server. Retrying…", true);
@@ -463,8 +467,18 @@
   function connectHost() {
     const g = guest; if (!g || g.closing) return;
     const conn = g.peer.connect(PREFIX + g.code, { reliable: true, serialization: 'json' });
-    g.conn = conn;
-    conn.on('open', () => { g.lastSeen = Date.now(); conn.send({ t: 'hello', v: PROTO, token: myToken, name: myName }); });
+    g.conn = conn; g.lastSeen = Date.now();
+    clearTimeout(g.openTimer);
+    g.openTimer = setTimeout(() => {   // the host exists but a direct connection never formed
+      if (guest !== g || g.closing || g.conn !== conn || conn.open) return;
+      g.slowOpens = (g.slowOpens || 0) + 1;
+      try { conn.close(); } catch (e) {}
+      g.conn = null;
+      guestRetry(g.slowOpens >= 2
+        ? "Can't connect to the host. A network on one side may be blocking direct connections (some cell and work networks do). Try switching to Wi-Fi. Still trying…"
+        : 'Still connecting to the host…');
+    }, 15000);
+    conn.on('open', () => { clearTimeout(g.openTimer); g.slowOpens = 0; g.lastSeen = Date.now(); conn.send({ t: 'hello', v: PROTO, token: myToken, name: myName }); });
     conn.on('data', d => { if (guest === g) guestMsg(d); });
     conn.on('close', () => { if (guest === g && g.conn === conn) guestLost(); });
     conn.on('error', () => { if (guest === g && g.conn === conn) guestLost(); });
@@ -476,6 +490,7 @@
       guest.joined = true; guest.lobby = d; V = null;
       guestStatus(''); show('lobby'); renderLobby();
     } else if (d.t === 'game') {
+      if (!guest.joined || Date.now() - (guest.savedAt || 0) > 60000) { guest.savedAt = Date.now(); store.set('wc.guest', { code: guest.code, at: Date.now() }); }
       guest.joined = true; guestStatus('');
       if ($('game').hidden) show('game');
       const v = d.view; v.online = d.online; v.code = d.code;
@@ -507,8 +522,22 @@
   setInterval(() => {
     if (mode !== 'guest' || !guest) return;
     if (guest.conn && guest.conn.open) { try { guest.conn.send({ t: 'ping' }); } catch (e) {} }
-    if (guest.joined && guest.conn && Date.now() - guest.lastSeen > 16000) { try { guest.conn.close(); } catch (e) {} guestLost(); }
+    if (guest.conn && guest.conn.open && Date.now() - guest.lastSeen > 16000) { try { guest.conn.close(); } catch (e) {} guestLost(); }
   }, 4000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    if (mode === 'guest' && guest && !guest.closing) {
+      if (guest.conn && guest.conn.open) { try { guest.conn.send({ t: 'ping' }); } catch (e) {} }
+      else if (guest.peer) { clearTimeout(guest.retry); guest.retry = null; guestRetryNow(); }
+    }
+    if (mode === 'host' && room && room.peer && room.peer.disconnected && !room.peer.destroyed) { try { room.peer.reconnect(); } catch (e) {} }
+  });
+  function guestRetryNow() {
+    const g = guest; if (!g || g.closing) return;
+    if (g.peer.destroyed) openGuestPeer();
+    else if (g.peer.disconnected) { try { g.peer.reconnect(); } catch (e) { openGuestPeer(); } }
+    else connectHost();
+  }
   function guestLeave() {
     if (guest) {
       guest.closing = true; clearTimeout(guest.retry);
@@ -743,7 +772,7 @@
     el.innerHTML = [...V.log].reverse().slice(0, 80).map(e => {
       const who = e.p >= 0 && V.players[e.p] ? esc(V.players[e.p].name) : '';
       if (e.type === 'play') {
-        const ws = e.words.map(w => `<a href="${lookup(w.w, w.kind)}" target="_blank" rel="noopener" class="${w.kind === 2 ? 'ud' : ''}">${w.w.toUpperCase()}</a>`).join('');
+        const ws = e.words.map(w => `<a href="${lookup(w.w, w.kind)}" target="_blank" rel="noopener" class="${w.kind === 2 ? 'ud' : ''}">${esc(String(w.w).toUpperCase())}</a>`).join('');
         const notes = [e.bingo && 'bingo +50', e.cred && `street cred +${e.cred}`].filter(Boolean).join(' · ');
         return `<li><div class="who">${who}</div><div class="total">${e.total}</div><div class="lw">${ws}${notes ? `<span class="note">${notes}</span>` : ''}</div></li>`;
       }
@@ -924,6 +953,13 @@
   /* ---------- boot ---------- */
   const joinCode = new URLSearchParams(location.search).get('join');
   goHome('');
+  // pick up where you left off if the page reloaded mid-session (phones do this when you switch apps)
+  const RESUME_MS = 30 * 60 * 1000;
+  const savedHost = store.get('wc.host'), savedGuest = store.get('wc.guest');
+  if (!joinCode && typeof Peer !== 'undefined') {
+    if (savedHost && savedHost.code && savedHost.at && Date.now() - savedHost.at < RESUME_MS && !(savedHost.S && savedHost.S.over)) hostResume(savedHost);
+    else if (savedGuest && savedGuest.code && savedGuest.at && Date.now() - savedGuest.at < RESUME_MS) guestJoin(savedGuest.code, true);
+  }
   if (joinCode) {
     $('codeInput').value = joinCode.toUpperCase().slice(0, 5);
     setStatus('homeStatus', 'You were invited to a room. Pick a name, then tap Join.');
