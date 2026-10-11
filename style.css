@@ -294,4 +294,4 @@ body[data-screen="home"] .top { display: none; }
   .tword:last-child i:nth-child(4) { animation-delay: .30s } .tword:last-child i:nth-child(5) { animation-delay: .34s } .tword:last-child i:nth-child(6) { animation-delay: .38s }
   @keyframes tileIn { from { opacity: 0; translate: 0 -14px; } to { opacity: 1; translate: 0 0; } }
 }
-@media (max-width: 760px) { .hero::before, .hero::after { display: none; } }
+@media (max-width: 960px) { .hero::before, .hero::after { display: none; } }
