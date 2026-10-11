@@ -11,7 +11,7 @@
     del(k) { try { localStorage.removeItem(k); } catch (e) {} },
   };
 
-  const APP_VERSION = '1.1';
+  const APP_VERSION = '1.2';
   const PROTO = 2;                          // bump when host and guest messages change shape
   const PREFIX = 'wordcypher-v1-';          // PeerJS id = PREFIX + room code
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -99,6 +99,7 @@
 
   /* ---------- screens ---------- */
   function show(screen) {
+    document.body.dataset.screen = screen;
     $('home').hidden = screen !== 'home';
     $('lobby').hidden = screen !== 'lobby';
     $('game').hidden = screen !== 'game';

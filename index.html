@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=1.1">
+<link rel="stylesheet" href="style.css?v=1.2">
 </head>
 <body>
 <div class="wrap">
@@ -30,58 +30,63 @@
   </header>
 
   <!-- HOME -->
-  <section id="home" aria-label="Start a game">
-    <div class="home">
-      <section class="card">
-        <h2>Play online</h2>
-        <p class="lead">Host a room and send the code to up to 3 friends. Your browser runs the game, so keep this tab open while you play.</p>
-        <div class="field">
-          <label for="nameInput">Your name</label>
-          <div class="inrow">
-            <input class="text" id="nameInput" maxlength="20" autocomplete="off">
-            <button class="btn" id="btnDice" type="button" title="Random name">Random</button>
-          </div>
-        </div>
-        <div id="resumeBox" class="resume" hidden></div>
-        <button class="btn spray big" id="btnHost" type="button">Host a game</button>
-        <div class="field">
-          <label for="codeInput">Join with a code</label>
-          <form class="inrow" id="joinForm" autocomplete="off">
-            <input class="text code" id="codeInput" maxlength="5" placeholder="K7QXM" inputmode="text" autocapitalize="characters">
-            <button class="btn primary" type="submit">Join</button>
-          </form>
-        </div>
+  <section id="home" class="home2" aria-label="Start a game">
+    <div class="hero">
+      <h1 class="tiletitle" aria-label="Word Cypher">
+        <span class="tword" aria-hidden="true"><i>W<small>4</small></i><i>O<small>1</small></i><i>R<small>1</small></i><i>D<small>2</small></i></span>
+        <span class="tword" aria-hidden="true"><i>C<small>3</small></i><i>Y<small>4</small></i><i>P<small>3</small></i><i>H<small>4</small></i><i>E<small>1</small></i><i>R<small>1</small></i></span>
+      </h1>
+      <p class="tagline">Every word in the dictionary counts. <b>So does Urban Dictionary.</b></p>
+      <div class="namebar">
+        <label for="nameInput">Playing as</label>
+        <span class="namefield"><input class="text" id="nameInput" maxlength="20" autocomplete="off" spellcheck="false"><button class="btn onboard" id="btnDice" type="button" title="Pick a random name">Random</button></span>
+      </div>
+    </div>
+
+    <div id="resumeBox" class="resume" hidden></div>
+    <div id="soloResume" class="resume" hidden></div>
+
+    <div class="modes">
+      <section class="card mode" aria-labelledby="hOnline">
+        <div class="mode-head"><h2 id="hOnline">Play friends online</h2><span class="pill">2–4 players</span></div>
+        <p class="lead">Host a room and send the code. Your browser runs the game, so keep the tab open while you play.</p>
+        <button class="btn spray big" id="btnHost" type="button">Host a room</button>
+        <div class="or"><span>or join a room</span></div>
+        <form class="joinrow" id="joinForm" autocomplete="off">
+          <input class="text code" id="codeInput" maxlength="5" placeholder="Room code" inputmode="text" autocapitalize="characters" spellcheck="false" aria-label="Room code">
+          <button class="btn primary" type="submit">Join</button>
+        </form>
         <div class="status" id="homeStatus" aria-live="polite"></div>
       </section>
 
-      <section class="card">
-        <h2>Play the CPU</h2>
-        <p class="lead">Solo game against the computer. It plays dictionary words and well-known slang.</p>
-        <div id="soloResume" class="resume" hidden></div>
-        <div class="levels">
-          <button class="opt" type="button" data-solo="easy"><b>Easy</b><span>Plays it loose</span></button>
-          <button class="opt" type="button" data-solo="medium"><b>Medium</b><span>Solid, beatable</span></button>
-          <button class="opt" type="button" data-solo="hard"><b>Hard</b><span>Max play every turn</span></button>
+      <section class="card mode" aria-labelledby="hCpu">
+        <div class="mode-head"><h2 id="hCpu">Play the CPU</h2><span class="pill">Solo</span></div>
+        <p class="lead">Pick a difficulty to start. The CPU plays dictionary words and well-known slang.</p>
+        <div class="levels2">
+          <button class="lvl" type="button" data-solo="easy"><span class="bars l1" aria-hidden="true"><i></i><i></i><i></i></span><b>Easy</b><span>Plays it loose</span></button>
+          <button class="lvl" type="button" data-solo="medium"><span class="bars l2" aria-hidden="true"><i></i><i></i><i></i></span><b>Medium</b><span>Solid, beatable</span></button>
+          <button class="lvl" type="button" data-solo="hard"><span class="bars l3" aria-hidden="true"><i></i><i></i><i></i></span><b>Hard</b><span>Best play, every turn</span></button>
         </div>
-        <label class="toggle"><input type="checkbox" id="soloSlang" checked><span><b>Allow Urban Dictionary slang</b><br><span style="color:var(--muted)">Turn off for dictionary-only.</span></span></label>
-      </section>
-
-      <section class="card">
-        <h2>House rules</h2>
-        <ul class="rules">
-          <li>Any word in the full English dictionary counts.</li>
-          <li>Urban Dictionary slang counts too, and every slang word you form adds <b>+5 street cred</b>.</li>
-          <li>Use all 7 tiles in one turn for a <b>+50 bingo</b>.</li>
-          <li>Tap a square and type to place tiles. Enter plays, Backspace takes back.</li>
-        </ul>
-        <div class="legend">
-          <span><i style="background:var(--tw)"></i>Triple word</span>
-          <span><i style="background:var(--dw)"></i>Double word</span>
-          <span><i style="background:var(--tl)"></i>Triple letter</span>
-          <span><i style="background:var(--dl)"></i>Double letter</span>
-        </div>
+        <label class="toggle"><input type="checkbox" id="soloSlang" checked><span><b>Allow Urban Dictionary slang</b><br><span class="sub">Turn off for a dictionary-only game.</span></span></label>
       </section>
     </div>
+
+    <section class="rulestrip" aria-labelledby="hRules">
+      <h2 id="hRules">House rules</h2>
+      <div class="rulegrid">
+        <div class="rule"><span class="big">273K</span><p>Every word in the English dictionary counts.</p></div>
+        <div class="rule"><span class="big ud">+5</span><p>Each Urban Dictionary word you form adds street cred.</p></div>
+        <div class="rule"><span class="big">+50</span><p>Use all 7 tiles in one turn for a bingo.</p></div>
+        <div class="rule"><span class="big">LIVE</span><p>New slang is checked on Urban Dictionary. It needs 3+ definitions.</p></div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--tw)"></i>Triple word</span>
+        <span><i style="background:var(--dw)"></i>Double word</span>
+        <span><i style="background:var(--tl)"></i>Triple letter</span>
+        <span><i style="background:var(--dl)"></i>Double letter</span>
+        <span class="tip">Tip: tap a square and type to place tiles. Enter plays.</span>
+      </div>
+    </section>
   </section>
 
   <!-- LOBBY -->
@@ -151,13 +156,13 @@
   </section>
 </div>
 
-<footer class="foot">Word Cypher v1.1 · <a href="https://github.com/lopoke89-ops/word-cypher" target="_blank" rel="noopener">Source</a></footer>
+<footer class="foot">Word Cypher v1.2 · <a href="https://github.com/lopoke89-ops/word-cypher" target="_blank" rel="noopener">Source</a></footer>
 
 <div class="overlay" id="overlay" hidden></div>
 
 <script src="peerjs.min.js"></script>
-<script src="js/engine.js?v=1.1"></script>
-<script src="js/game.js?v=1.1"></script>
-<script src="js/app.js?v=1.1"></script>
+<script src="js/engine.js?v=1.2"></script>
+<script src="js/game.js?v=1.2"></script>
+<script src="js/app.js?v=1.2"></script>
 </body>
 </html>
